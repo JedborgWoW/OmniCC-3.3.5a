@@ -52,6 +52,20 @@ if type(_G.CopyTable) ~= "function" then
 end
 
 -------------------------------------------------------------------------------
+-- tIndexOf (FrameXML helper not present on 3.3.5a)
+-------------------------------------------------------------------------------
+
+if type(_G.tIndexOf) ~= "function" then
+    function _G.tIndexOf(tbl, item)
+        for i, v in ipairs(tbl) do
+            if v == item then
+                return i
+            end
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
 -- C_AddOns namespace (Dragonflight) -> classic globals
 -------------------------------------------------------------------------------
 
@@ -130,6 +144,60 @@ if type(_G.C_Timer.After) ~= "function" then
 end
 
 -------------------------------------------------------------------------------
+-- Region:SetSize / GetSize (added in Cataclysm) -> SetWidth + SetHeight.
+-- Applied to every widget/region method table OmniCC and the bundled Ace3 use,
+-- since each frame type has its own method table on this client.
+-------------------------------------------------------------------------------
+
+do
+    local function addSizeMethods(index)
+        if type(index) ~= "table" then
+            return
+        end
+        if type(index.GetSize) ~= "function" then
+            function index.GetSize(self)
+                return self:GetWidth(), self:GetHeight()
+            end
+        end
+        if type(index.SetSize) ~= "function" then
+            function index.SetSize(self, width, height)
+                self:SetWidth(width)
+                self:SetHeight(height or width)
+            end
+        end
+    end
+
+    local function indexOf(object)
+        local mt = object and getmetatable(object)
+        return mt and mt.__index
+    end
+
+    local probe = CreateFrame("Frame")
+
+    -- frame-derived widget types
+    local frameTypes = {
+        "Frame", "Button", "CheckButton", "EditBox", "Slider", "StatusBar",
+        "ScrollFrame", "Cooldown", "GameTooltip", "ColorSelect", "MessageFrame",
+        "SimpleHTML", "ScrollingMessageFrame", "Model",
+    }
+    for _, frameType in ipairs(frameTypes) do
+        local ok, f = pcall(CreateFrame, frameType)
+        if ok and f then
+            addSizeMethods(indexOf(f))
+            if f.Hide then
+                f:Hide()
+            end
+        end
+    end
+
+    -- regions
+    addSizeMethods(indexOf(probe:CreateTexture()))
+    addSizeMethods(indexOf(probe:CreateFontString()))
+
+    probe:Hide()
+end
+
+-------------------------------------------------------------------------------
 -- Texture:SetColorTexture (added in Legion) -> SetTexture(r, g, b, a)
 -------------------------------------------------------------------------------
 
@@ -142,6 +210,32 @@ do
             self:SetTexture(r, g, b, a or 1)
         end
     end
+end
+
+-------------------------------------------------------------------------------
+-- Frame methods added after 3.3.5a that the bundled (modern) Ace3 calls.
+-- These are layout/keyboard niceties with no equivalent on this client, so they
+-- become harmless no-ops.
+-------------------------------------------------------------------------------
+
+do
+    local frame = CreateFrame("Frame")
+    local mt = getmetatable(frame)
+    local index = mt and mt.__index
+
+    if type(index) == "table" then
+        if type(index.SetFixedFrameStrata) ~= "function" then
+            function index.SetFixedFrameStrata() end
+        end
+        if type(index.SetFixedFrameLevel) ~= "function" then
+            function index.SetFixedFrameLevel() end
+        end
+        if type(index.SetPropagateKeyboardInput) ~= "function" then
+            function index.SetPropagateKeyboardInput() end
+        end
+    end
+
+    frame:Hide()
 end
 
 -------------------------------------------------------------------------------

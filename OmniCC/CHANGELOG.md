@@ -3,13 +3,21 @@
 ## 11.2.8-wotlk (3.3.5a backport)
 
 Backport of OmniCC 11.2.8 to the Wrath of the Lich King 3.3.5a client
-(interface 30300). Functionally equivalent to the retail/classic 11.2.8 release,
-with the following client-specific changes:
+(interface 30300). Functionally equivalent to the retail/classic 11.2.8 release
+and **self-contained — it does not require ClassicAPI or any other compatibility
+addon on a stock 3.3.5a client**. Client-specific changes:
 
 * Added `OmniCC/compat.lua`, which shims APIs that do not exist on 3.3.5a:
-  `C_Timer.After`, `GetTickTime`, `Round`, `C_AddOns`, `C_UI.Reload`,
-  `securecallfunction`, `Texture:SetColorTexture`, and the newer `Cooldown`
-  widget methods (`SetCooldownDuration`, `Clear`, `SetHideCountdownNumbers`, …).
+  `C_Timer.After`, `GetTickTime`, `Round`, `CopyTable`, `tIndexOf`, `C_AddOns`,
+  `C_UI.Reload`, `securecallfunction`, `Region:SetSize`/`GetSize`,
+  `Texture:SetColorTexture`, the retail-only frame methods
+  `SetFixedFrameStrata`/`SetFixedFrameLevel`/`SetPropagateKeyboardInput`, and the
+  newer `Cooldown` widget methods (`SetCooldownDuration`, `Clear`,
+  `SetHideCountdownNumbers`, …).
+* Made the bundled (modern) Ace3 run on a stock client: converted numeric
+  texture FileDataIDs back to texture paths, removed `BackdropTemplate` usage
+  (3.3.5a has native `SetBackdrop`), and replaced `DialogBorderOpaqueTemplate`
+  with a native backdrop.
 * Rewrote the cooldown tracker to drive off `Cooldown:SetCooldown` (the only
   cooldown entry point on 3.3.5a). Removed charge / loss-of-control cooldowns,
   the Midnight "secret value" handling, and the Blizzard countdown-text toggle,

@@ -43,11 +43,19 @@ window, so it costs nothing while playing.
 ## What changed for 3.3.5a
 
 The original 11.2.8 source targets modern clients. The backport keeps the same
-architecture and behaviour but adapts the parts that don't exist on 3.3.5a:
+architecture and behaviour but adapts the parts that don't exist on 3.3.5a. It
+is **self-contained and does not require ClassicAPI** (or any other compat addon)
+on a stock 3.3.5a client:
 
 * A new `OmniCC/compat.lua` shims missing APIs (`C_Timer.After`, `GetTickTime`,
-  `Round`, `C_AddOns`, `C_UI.Reload`, `securecallfunction`,
-  `Texture:SetColorTexture`, and the newer `Cooldown` widget methods).
+  `Round`, `CopyTable`, `tIndexOf`, `C_AddOns`, `C_UI.Reload`,
+  `securecallfunction`, `Region:SetSize`/`GetSize`, `Texture:SetColorTexture`,
+  `SetFixedFrameStrata`/`SetFixedFrameLevel`/`SetPropagateKeyboardInput`, and the
+  newer `Cooldown` widget methods).
+* The bundled Ace3 libraries were adapted for a stock client: numeric texture
+  FileDataIDs converted back to texture paths, `BackdropTemplate` usage removed
+  (native `SetBackdrop`), and `DialogBorderOpaqueTemplate` replaced with a native
+  backdrop.
 * The cooldown tracker drives off `Cooldown:SetCooldown` (the only cooldown entry
   point on 3.3.5a). Charge / loss-of-control cooldowns, "Midnight" secret values
   and the Blizzard countdown-text toggle were removed — none exist on this
