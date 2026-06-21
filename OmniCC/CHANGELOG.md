@@ -8,12 +8,15 @@ and **self-contained — it does not require ClassicAPI or any other compatibili
 addon on a stock 3.3.5a client**. Client-specific changes:
 
 * Added `OmniCC/compat.lua`, which shims APIs that do not exist on 3.3.5a:
-  `C_Timer.After`, `GetTickTime`, `Round`, `CopyTable`, `tIndexOf`, `C_AddOns`,
+  `C_Timer.After`, `GetTickTime`, `Round`, `CopyTable`, `tIndexOf`,
+  `GetCurrentRegion`/`GetCurrentRegionName` (used by AceDB), `C_AddOns`,
   `C_UI.Reload`, `securecallfunction`, `Region:SetSize`/`GetSize`,
   `Texture:SetColorTexture`, the retail-only frame methods
   `SetFixedFrameStrata`/`SetFixedFrameLevel`/`SetPropagateKeyboardInput`, and the
   newer `Cooldown` widget methods (`SetCooldownDuration`, `Clear`,
   `SetHideCountdownNumbers`, …).
+* The cooldown text now lives on a wrapper frame so it can be scaled — 3.3.5a
+  has no `Region:SetScale` (scaling is frame-only on this client).
 * Made the bundled (modern) Ace3 run on a stock client: converted numeric
   texture FileDataIDs back to texture paths, removed `BackdropTemplate` usage
   (3.3.5a has native `SetBackdrop`), and replaced `DialogBorderOpaqueTemplate`

@@ -33,7 +33,12 @@ end
 function Display:Create(owner)
     local display = setmetatable(Addon:CreateHiddenFrame('Frame', nil, owner), Display)
 
-    display.text = display:CreateFontString(nil, 'OVERLAY')
+    -- 3.3.5a has no Region:SetScale (it's frame-only on this client), so the
+    -- cooldown text lives on a wrapper frame that we scale instead.
+    display.textFrame = CreateFrame('Frame', nil, display)
+    display.textFrame:SetAllPoints(display)
+
+    display.text = display.textFrame:CreateFontString(nil, 'OVERLAY')
     display.cooldowns = {}
 
     display.updateSize = function()
@@ -291,7 +296,7 @@ function Display:UpdateCooldownTextPositionSizeAndColor()
 
     local textScale = sizeRatio * styleRatio
     text:Show()
-    text:SetScale(textScale)
+    self.textFrame:SetScale(textScale)
     text:SetTextColor(style.r, style.g, style.b, style.a)
 
     text:ClearAllPoints()

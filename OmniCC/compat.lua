@@ -52,6 +52,23 @@ if type(_G.CopyTable) ~= "function" then
 end
 
 -------------------------------------------------------------------------------
+-- GetCurrentRegion / GetCurrentRegionName (added in WoD) -- used by AceDB-3.0
+-- for region-scoped profile keys. 3.3.5a has no region concept, so report US.
+-------------------------------------------------------------------------------
+
+if type(_G.GetCurrentRegion) ~= "function" then
+    function _G.GetCurrentRegion()
+        return 1
+    end
+end
+
+if type(_G.GetCurrentRegionName) ~= "function" then
+    function _G.GetCurrentRegionName()
+        return "US"
+    end
+end
+
+-------------------------------------------------------------------------------
 -- tIndexOf (FrameXML helper not present on 3.3.5a)
 -------------------------------------------------------------------------------
 
