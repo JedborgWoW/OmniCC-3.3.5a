@@ -8,7 +8,7 @@ A backport of **OmniCC 11.2.8** to the World of Warcraft *Wrath of the Lich King
 > **João Cardoso (Jaliborc)**.
 > Original project: <https://github.com/tullamods/OmniCC>
 >
-> This 3.3.5a backport was made by **Rikard Jedborg**
+> This 3.3.5a backport was made by **Jedborg**
 > (<https://github.com/JedborgWoW>). All original credit for OmniCC goes to its
 > authors — this repository only adapts their work to run on the 3.3.5a client.
 
