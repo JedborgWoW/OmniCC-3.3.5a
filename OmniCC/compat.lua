@@ -9,6 +9,57 @@
 local _G = _G
 local floor = math.floor
 local tinsert, tremove = table.insert, table.remove
+local select, unpack = select, unpack
+
+-------------------------------------------------------------------------------
+-- WOW_PROJECT_ID (added in Legion / Classic) -- some bundled code branches on
+-- it (e.g. AceGUI's ColorPicker). 3.3.5a never sets these, so define the
+-- standard constants and report ourselves as the Wrath Classic project so the
+-- upstream code takes the nearest Classic code path.
+-------------------------------------------------------------------------------
+
+if _G.WOW_PROJECT_MAINLINE == nil then
+    _G.WOW_PROJECT_MAINLINE = 1
+end
+if _G.WOW_PROJECT_CLASSIC == nil then
+    _G.WOW_PROJECT_CLASSIC = 2
+end
+if _G.WOW_PROJECT_BURNING_CRUSADE_CLASSIC == nil then
+    _G.WOW_PROJECT_BURNING_CRUSADE_CLASSIC = 5
+end
+if _G.WOW_PROJECT_WRATH_CLASSIC == nil then
+    _G.WOW_PROJECT_WRATH_CLASSIC = 11
+end
+if _G.WOW_PROJECT_ID == nil then
+    _G.WOW_PROJECT_ID = _G.WOW_PROJECT_WRATH_CLASSIC
+end
+
+-------------------------------------------------------------------------------
+-- xpcall vararg support (Lua 5.2+). On Lua 5.1 (3.3.5a) xpcall(f, handler, ...)
+-- silently DROPS the extra arguments, so Ace3's safecall
+-- (xpcall(func, errorhandler, ...)) loses `self` and blows up with
+-- "attempt to index local 'self' (a nil value)". Wrap any extra args in a
+-- closure so they reach func. No-arg calls keep the native fast path.
+-------------------------------------------------------------------------------
+
+do
+    local orig_xpcall = xpcall
+    -- probe whether the native xpcall already forwards varargs (5.2+): the
+    -- second return value is the value the probe function passed through.
+    local _, forwarded = orig_xpcall(function(a) return a end, function() end, true)
+    if not forwarded then
+        function _G.xpcall(f, errorhandler, ...)
+            local n = select("#", ...)
+            if n == 0 then
+                return orig_xpcall(f, errorhandler)
+            end
+            local args = { ... }
+            return orig_xpcall(function()
+                return f(unpack(args, 1, n))
+            end, errorhandler)
+        end
+    end
+end
 
 -------------------------------------------------------------------------------
 -- securecallfunction (used by CallbackHandler-1.0)
@@ -319,4 +370,43 @@ do
     end
 
     cd:Hide()
+end
+
+-------------------------------------------------------------------------------
+-- GameTooltip:SetSpellByID (added in MoP) and crash-safe SetHyperlink.
+--
+-- SetSpellByID does not exist on 3.3.5a. Worse, SetHyperlink("spell:<id>") with
+-- a spell id the core does not actually know about triggers a *native* client
+-- crash (ACCESS_VIOLATION, see issue #132). We therefore always validate spell
+-- links with GetSpellInfo before handing them to the real SetHyperlink, and
+-- build SetSpellByID on top of that guarded path. Patching the shared tooltip
+-- metatable covers GameTooltip, ItemRefTooltip and every library-owned tooltip.
+-------------------------------------------------------------------------------
+
+do
+    local mt = GameTooltip and getmetatable(GameTooltip)
+    local index = mt and mt.__index
+
+    if type(index) == "table" then
+        local origSetHyperlink = index.SetHyperlink
+        if type(origSetHyperlink) == "function" then
+            function index.SetHyperlink(self, link, ...)
+                local spellId = link and tostring(link):match("spell:(%d+)")
+                if spellId and not GetSpellInfo(tonumber(spellId)) then
+                    -- unknown spell id -> would hard-crash the client; ignore it
+                    return
+                end
+                return origSetHyperlink(self, link, ...)
+            end
+        end
+
+        if type(index.SetSpellByID) ~= "function" then
+            function index.SetSpellByID(self, spellId)
+                if not spellId or not GetSpellInfo(spellId) then
+                    return
+                end
+                return self:SetHyperlink("spell:" .. spellId)
+            end
+        end
+    end
 end

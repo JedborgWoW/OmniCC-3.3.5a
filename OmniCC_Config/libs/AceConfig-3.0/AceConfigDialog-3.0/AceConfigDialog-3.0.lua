@@ -2022,6 +2022,18 @@ function AceConfigDialog:AddToBlizOptions(appName, name, parent, ...)
 		group:SetCallback("OnHide", ClearBlizPanel)
 
 		local categoryName = name or appName
+		-- 3.3.5a backport: the retail Settings canvas API (10.0) does not exist.
+		-- Fall back to the classic InterfaceOptions panel registration so the
+		-- frame still shows up in the Blizzard options window.
+		if not (Settings and Settings.RegisterCanvasLayoutCategory) then
+			group.frame.name = categoryName
+			if parent then
+				group.frame.parent = BlizOptionsIDMap[parent] or parent
+			end
+			InterfaceOptions_AddCategory(group.frame)
+			BlizOptionsIDMap[categoryName] = categoryName
+			return group.frame, categoryName
+		end
 		if parent then
 			local parentID = BlizOptionsIDMap[parent] or parent
 			local category = Settings.GetCategory(parentID)
