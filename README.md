@@ -26,8 +26,7 @@ standard interface to your favorite addon.
 1. Download / clone this repository.
 2. Copy the **`OmniCC`** and **`OmniCC_Config`** folders into
    `World of Warcraft\Interface\AddOns\`.
-3. Restart the game (or reload the UI) and make sure both addons are enabled on
-   the character selection screen.
+3. Restart the game and make sure both addons are enabled on the character selection screen.
 
 ## Usage
 
