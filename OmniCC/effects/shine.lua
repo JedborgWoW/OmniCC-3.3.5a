@@ -12,6 +12,11 @@ local unused = {}
 
 local function onShineAnimationFinished(self)
 	local parent = self:GetParent()
+	-- Mark a natural finish so OnHide does not call animation:Stop() on the
+	-- group whose OnFinished we are still inside. On stock 3.3.5a stopping an
+	-- animation group from within its own finish callback corrupts the
+	-- animation manager and crashes the client (#132).
+	parent.finished = true
 	if parent:IsShown() then
 		parent:Hide()
 	end
@@ -55,7 +60,12 @@ end
 local function onShineFrameHidden(self)
 	if not unused[self] then
 		unused[self] = true
-		self.animation:Stop()
+		-- Only stop when hidden externally mid-animation; a group that just
+		-- finished is already stopped and stopping it here would crash 3.3.5a.
+		if not self.finished then
+			self.animation:Stop()
+		end
+		self.finished = nil
 		self:Hide()
 	end
 end
