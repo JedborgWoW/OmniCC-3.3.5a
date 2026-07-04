@@ -7,6 +7,13 @@ Backport of OmniCC 11.2.8 to the Wrath of the Lich King 3.3.5a client
 and **self-contained — it does not require ClassicAPI or any other compatibility
 addon on a stock 3.3.5a client**. Client-specific changes:
 
+* **Widget-metatable shims install with `rawset` (2026-07-04).** On this client
+  the frame-type `__index` method table carries a `__newindex` guard that
+  silently drops a plain `function index.Name` (an assignment) for a method that
+  doesn't exist yet; `compat.lua` now installs its `SetSize`/`GetSize`,
+  `SetColorTexture`, the Cooldown swipe/countdown/duration helpers and
+  `GameTooltip:SetSpellByID` via `rawset`, so they can't be silently lost on a
+  stock client.
 * Added `OmniCC/compat.lua`, which shims APIs that do not exist on 3.3.5a:
   `C_Timer.After`, `GetTickTime`, `Round`, `CopyTable`, `tIndexOf`,
   `GetCurrentRegion`/`GetCurrentRegionName` (used by AceDB), `C_AddOns`,

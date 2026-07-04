@@ -222,16 +222,21 @@ do
         if type(index) ~= "table" then
             return
         end
+        -- rawset for NEW methods: on this client the frame-type __index table
+        -- carries a __newindex guard that silently drops a plain `function
+        -- index.X` (an assignment) for a key that doesn't exist yet, leaving the
+        -- method nil. rawset bypasses it; the type()~="function" reads stay
+        -- chain-aware so a native is never shadowed.
         if type(index.GetSize) ~= "function" then
-            function index.GetSize(self)
+            rawset(index, "GetSize", function(self)
                 return self:GetWidth(), self:GetHeight()
-            end
+            end)
         end
         if type(index.SetSize) ~= "function" then
-            function index.SetSize(self, width, height)
+            rawset(index, "SetSize", function(self, width, height)
                 self:SetWidth(width)
                 self:SetHeight(height or width)
-            end
+            end)
         end
     end
 
@@ -274,9 +279,9 @@ do
     local mt = getmetatable(tex)
     local index = mt and mt.__index
     if type(index) == "table" and type(index.SetColorTexture) ~= "function" then
-        function index.SetColorTexture(self, r, g, b, a)
+        rawset(index, "SetColorTexture", function(self, r, g, b, a)
             self:SetTexture(r, g, b, a or 1)
-        end
+        end)
     end
 end
 
@@ -293,13 +298,13 @@ do
 
     if type(index) == "table" then
         if type(index.SetFixedFrameStrata) ~= "function" then
-            function index.SetFixedFrameStrata() end
+            rawset(index, "SetFixedFrameStrata", function() end)
         end
         if type(index.SetFixedFrameLevel) ~= "function" then
-            function index.SetFixedFrameLevel() end
+            rawset(index, "SetFixedFrameLevel", function() end)
         end
         if type(index.SetPropagateKeyboardInput) ~= "function" then
-            function index.SetPropagateKeyboardInput() end
+            rawset(index, "SetPropagateKeyboardInput", function() end)
         end
     end
 
@@ -323,49 +328,49 @@ do
 
     if type(index) == "table" then
         if type(index.SetCooldownDuration) ~= "function" then
-            function index.SetCooldownDuration(self, duration, modRate)
+            rawset(index, "SetCooldownDuration", function(self, duration, modRate)
                 local d = tonumber(duration) or 0
                 if d > 0 then
                     self:SetCooldown(GetTime(), d)
                 else
                     self:SetCooldown(0, 0)
                 end
-            end
+            end)
         end
 
         if type(index.GetCooldownDuration) ~= "function" then
-            function index.GetCooldownDuration(self)
+            rawset(index, "GetCooldownDuration", function(self)
                 return self._occ_duration and (self._occ_duration * 1000) or 0
-            end
+            end)
         end
 
         if type(index.Clear) ~= "function" then
-            function index.Clear(self)
+            rawset(index, "Clear", function(self)
                 self:SetCooldown(0, 0)
-            end
+            end)
         end
 
         -- purely cosmetic spiral tuning that doesn't exist on 3.3.5a
         if type(index.SetSwipeColor) ~= "function" then
-            function index.SetSwipeColor() end
+            rawset(index, "SetSwipeColor", function() end)
         end
         if type(index.SetDrawEdge) ~= "function" then
-            function index.SetDrawEdge() end
+            rawset(index, "SetDrawEdge", function() end)
         end
         if type(index.SetDrawSwipe) ~= "function" then
-            function index.SetDrawSwipe() end
+            rawset(index, "SetDrawSwipe", function() end)
         end
         if type(index.SetEdgeTexture) ~= "function" then
-            function index.SetEdgeTexture() end
+            rawset(index, "SetEdgeTexture", function() end)
         end
         if type(index.SetHideCountdownNumbers) ~= "function" then
-            function index.SetHideCountdownNumbers() end
+            rawset(index, "SetHideCountdownNumbers", function() end)
         end
         -- 3.3.5a never draws its own countdown numbers, so report them hidden
         if type(index.GetHideCountdownNumbers) ~= "function" then
-            function index.GetHideCountdownNumbers()
+            rawset(index, "GetHideCountdownNumbers", function()
                 return true
-            end
+            end)
         end
     end
 
@@ -401,12 +406,12 @@ do
         end
 
         if type(index.SetSpellByID) ~= "function" then
-            function index.SetSpellByID(self, spellId)
+            rawset(index, "SetSpellByID", function(self, spellId)
                 if not spellId or not GetSpellInfo(spellId) then
                     return
                 end
                 return self:SetHyperlink("spell:" .. spellId)
-            end
+            end)
         end
     end
 end
