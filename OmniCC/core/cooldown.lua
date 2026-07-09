@@ -332,13 +332,16 @@ function Cooldown:SetNoCooldownCount(disable, owner)
 end
 
 -- 3.3.5a has no OnCooldownDone script, so we schedule a check at the moment the
--- cooldown is expected to finish. A per-cooldown generation counter invalidates
--- any pending check if the cooldown is changed before it completes.
+-- cooldown is expected to finish. ONE callback closure per cooldown frame,
+-- created on first use: allocating a fresh closure on every cooldown change
+-- (the old per-schedule generation-counter design) churned garbage across the
+-- whole UI's cooldowns. Staleness needs no counter: a callback firing at the
+-- wrong moment is a no-op, because CanShowFinishEffect only passes inside the
+-- finish window (remain within [FINISH_EFFECT_BUFFER, GCD remaining]) and
+-- TryShowFinishEffect zeroes start/duration after showing, so of several
+-- pending checks for the same cooldown at most one can ever fire the effect.
 ---@param self OmniCCCooldown
 function Cooldown:ScheduleFinishEffect()
-    local gen = (self._occ_fx_gen or 0) + 1
-    self._occ_fx_gen = gen
-
     if self._occ_gcd then
         return
     end
@@ -368,11 +371,13 @@ function Cooldown:ScheduleFinishEffect()
         return
     end
 
-    C_Timer.After(remain, function()
-        if self._occ_fx_gen == gen then
-            Cooldown.TryShowFinishEffect(self)
-        end
-    end)
+    local check = self._occ_fx_check
+    if not check then
+        check = function() Cooldown.TryShowFinishEffect(self) end
+        self._occ_fx_check = check
+    end
+
+    C_Timer.After(remain, check)
 end
 
 ---@param self OmniCCCooldown

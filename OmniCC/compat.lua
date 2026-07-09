@@ -179,34 +179,72 @@ if type(_G.C_Timer) ~= "table" then
 end
 
 if type(_G.C_Timer.After) ~= "function" then
-    local pending = {}
+    -- Zero-allocation scheduler. OmniCC reschedules an After callback for EVERY
+    -- tick of EVERY visible cooldown timer (plus every finish effect and display
+    -- resize), so a fresh entry table per call - and tremove's array shifting on
+    -- every expiry - churned enough garbage to contribute to periodic ~1s GC
+    -- freezes. Entry tables are pooled and the queue is compacted in place.
+    local pending = {}   -- live entries, kept dense in 1..npending
+    local npending = 0
+    local pool = {}      -- expired entry tables, reused by After
+    local npool = 0
     local handler = CreateFrame("Frame")
     handler:Hide()
 
     handler:SetScript("OnUpdate", function(self)
         local now = GetTime()
-        -- iterate backwards so we can remove in-place; callbacks scheduled by
-        -- the callbacks themselves get appended and run on a later frame
-        local count = #pending
-        for i = count, 1, -1 do
+        -- callbacks scheduled by the callbacks themselves land at indexes > n
+        -- and run on a later frame, exactly like the old backwards loop
+        local n = npending
+        local kept = 0
+        for i = 1, n do
             local entry = pending[i]
             if now >= entry.at then
-                tremove(pending, i)
                 local cb = entry.cb
+                -- recycle BEFORE the call so the entry drops its closure even if
+                -- the callback errors; After may hand it out again immediately
+                entry.cb = false
+                npool = npool + 1
+                pool[npool] = entry
                 local ok, err = pcall(cb)
                 if not ok then
                     geterrorhandler()(err)
                 end
+            else
+                kept = kept + 1
+                if kept ~= i then
+                    pending[kept] = entry
+                end
             end
         end
+        -- slide any entries appended during the loop down onto the kept block
+        for i = n + 1, npending do
+            kept = kept + 1
+            pending[kept] = pending[i]
+        end
+        for i = kept + 1, npending do
+            pending[i] = nil
+        end
+        npending = kept
 
-        if #pending == 0 then
+        if npending == 0 then
             self:Hide()
         end
     end)
 
     function _G.C_Timer.After(delay, callback)
-        pending[#pending + 1] = { at = GetTime() + (delay or 0), cb = callback }
+        local entry
+        if npool > 0 then
+            entry = pool[npool]
+            pool[npool] = nil
+            npool = npool - 1
+        else
+            entry = {}
+        end
+        entry.at = GetTime() + (delay or 0)
+        entry.cb = callback
+        npending = npending + 1
+        pending[npending] = entry
         handler:Show()
     end
 end

@@ -7,6 +7,25 @@ Backport of OmniCC 11.2.8 to the Wrath of the Lich King 3.3.5a client
 and **self-contained — it does not require ClassicAPI or any other compatibility
 addon on a stock 3.3.5a client**. Client-specific changes:
 
+* **Removed the hot-path garbage behind recurring ~1s freezes (2026-07-09).**
+  OmniCC hooks every cooldown frame in the whole UI, so per-call allocations
+  multiply enormously and the Lua GC ran huge collection cycles ("the game
+  freezes for about a second, repeatedly; disabling OmniCC stops it"). Three
+  sources, all now allocation-free in steady state: (1) the `C_Timer.After`
+  shim built a fresh entry table per call — and OmniCC reschedules an After for
+  every tick of every visible timer — plus `tremove` array-shifting on every
+  expiry; entries are now pooled and the queue compacts in place. (2)
+  `Timer:GetOrCreate` built a `strjoin`'d string key (2–3 fresh strings, unique
+  per cast) on every display update; timers are now indexed by
+  `(settings, endTime)` tables with a numeric generation as the staleness
+  guard — `kind` is always `'default'` on 3.3.5a — and the subscriber table is
+  pooled across timer incarnations (with `Timer:Destroy` made re-entrancy-safe
+  by invalidating the key before notifying subscribers). (3) every cooldown
+  change with a finish effect allocated a fresh closure for the
+  finish-time check; each cooldown frame now reuses one closure — the
+  generation counter it replaced was redundant, since `CanShowFinishEffect`
+  validates the finish window at fire time and `TryShowFinishEffect` zeroes
+  the cooldown after showing.
 * **Widget-metatable shims install with `rawset` (2026-07-04).** On this client
   the frame-type `__index` method table carries a `__newindex` guard that
   silently drops a plain `function index.Name` (an assignment) for a method that

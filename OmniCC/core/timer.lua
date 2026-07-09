@@ -25,8 +25,19 @@ local SECONDS_THRESHOLD = MINUTE - HALF_SECOND -- 59.5 seconds
 local MINUTES_THRESHOLD = HOUR - HALF_MINUTE -- 59.5 minutes
 local HOURS_THRESHOLD = DAY - HALF_HOUR -- 23.5 hours
 
----@type { [string]: OmniCCTimer }
+-- Active timers indexed by [settings][endTime] instead of the upstream
+-- strjoin'd string key ('kind/endTime/settings'): building that key allocated
+-- 2-3 fresh strings on EVERY display update (endTime is unique per cast), which
+-- churned enough garbage across the whole UI's cooldowns to contribute to
+-- periodic GC freezes. kind is always 'default' on 3.3.5a (no charge/
+-- loss-of-control cooldowns, see cooldown.lua GetKind), so (settings, endTime)
+-- alone identifies a timer. `key` is now a per-incarnation generation NUMBER,
+-- serving the same two purposes the string served: staleness guard for
+-- scheduled callbacks and change detection in Display:UpdateTimer.
+---@type { [table]: { [number]: OmniCCTimer } }
 local active = {}
+local NO_SETTINGS = {}  -- bucket for cooldowns without settings
+local generation = 0
 
 ---@type { [OmniCCTimer]: true }
 local inactive = setmetatable({}, {__mode = 'k'})
@@ -58,9 +69,15 @@ function Timer:GetOrCreate(cooldown)
 
     local endTime = (start + duration) * SECOND
     local kind = cooldown._occ_kind
-    local key = strjoin('/', kind, tostring(endTime), tostring(settings or 'NONE'))
 
-    local timer = active[key]
+    local bucket = settings or NO_SETTINGS
+    local timers = active[bucket]
+    if not timers then
+        timers = {}
+        active[bucket] = timers
+    end
+
+    local timer = timers[endTime]
     if not timer then
         timer = next(inactive)
 
@@ -70,15 +87,26 @@ function Timer:GetOrCreate(cooldown)
             timer = setmetatable({}, Timer)
         end
 
+        generation = generation + 1
+        local key = generation
+
         timer.endTime = endTime
         timer.key = key
+        timer.bucket = bucket
         timer.kind = kind
         timer.settings = settings
-        timer.subscribers = {}
+        -- reuse the subscriber table wiped by Destroy instead of allocating
+        local subscribers = timer.subscribersPool
+        if subscribers then
+            timer.subscribersPool = nil
+        else
+            subscribers = {}
+        end
+        timer.subscribers = subscribers
         timer.callback = function() timer:Update(key) end
         timer:Update(key)
 
-        active[key] = timer
+        timers[endTime] = timer
     end
 
     return timer
@@ -89,16 +117,32 @@ function Timer:Destroy()
         return
     end
 
-    active[self.key] = nil
+    local timers = active[self.bucket]
+    if timers and timers[self.endTime] == self then
+        timers[self.endTime] = nil
+    end
+
+    -- invalidate FIRST: an OnTimerDestroyed callback below can re-enter Destroy
+    -- through Display:UpdateTimer -> Unsubscribe, and both of those early-return
+    -- on a nil key. Upstream nilled the key last, which let the re-entrant call
+    -- run a full second Destroy pass (double notifications); with the pooled
+    -- subscriber table below that second pass would also wipe/nil the table
+    -- out from under this loop.
+    self.key = nil
 
     -- clear subscribers
-    for subscriber in pairs(self.subscribers) do
+    local subscribers = self.subscribers
+    for subscriber in pairs(subscribers) do
         subscriber:OnTimerDestroyed(self)
     end
 
+    -- park the subscriber table for the next incarnation (see GetOrCreate)
+    wipe(subscribers)
+    self.subscribersPool = subscribers
+
     -- reset fields
     self.endTime = nil
-    self.key = nil
+    self.bucket = nil
     self.kind = nil
     self.settings = nil
     self.state = nil
@@ -283,8 +327,11 @@ function Timer:ForActive(method, ...)
         return
     end
 
-    for _, timer in pairs(active) do
-        func(timer, ...)
+    -- active is bucketed by settings (see the note at the top)
+    for _, timers in pairs(active) do
+        for _, timer in pairs(timers) do
+            func(timer, ...)
+        end
     end
 end
 
